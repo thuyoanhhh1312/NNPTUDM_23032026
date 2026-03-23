@@ -166,12 +166,57 @@ router.post(
       });
 
       if (!roleUser) {
-        return res
-          .status(400)
-          .send({
-            message: "Khong tim thay role user. Hay tao role user truoc.",
-          });
+        return res.status(400).send({
+          message: "Khong tim thay role user. Hay tao role user truoc.",
+        });
       }
+
+      const extractCellText = function (cellValue) {
+        if (cellValue === null || cellValue === undefined) {
+          return "";
+        }
+
+        if (
+          typeof cellValue === "string" ||
+          typeof cellValue === "number" ||
+          typeof cellValue === "boolean"
+        ) {
+          return String(cellValue);
+        }
+
+        if (cellValue instanceof Date) {
+          return cellValue.toISOString();
+        }
+
+        if (Array.isArray(cellValue.richText)) {
+          return cellValue.richText
+            .map(function (part) {
+              return part.text || "";
+            })
+            .join("");
+        }
+
+        if (typeof cellValue.text === "string") {
+          return cellValue.text;
+        }
+
+        if (
+          typeof cellValue.result === "string" ||
+          typeof cellValue.result === "number" ||
+          typeof cellValue.result === "boolean"
+        ) {
+          return String(cellValue.result);
+        }
+
+        if (typeof cellValue.hyperlink === "string") {
+          if (cellValue.hyperlink.toLowerCase().startsWith("mailto:")) {
+            return cellValue.hyperlink.slice(7);
+          }
+          return cellValue.hyperlink;
+        }
+
+        return "";
+      };
 
       const headerRow = worksheet.getRow(1);
       let usernameCol = null;
@@ -179,9 +224,7 @@ router.post(
 
       for (let c = 1; c <= headerRow.cellCount; c++) {
         let headerValue = headerRow.getCell(c).value;
-        let normalized = String(headerValue || "")
-          .trim()
-          .toLowerCase();
+        let normalized = extractCellText(headerValue).trim().toLowerCase();
         if (normalized === "username") {
           usernameCol = c;
         }
@@ -200,8 +243,10 @@ router.post(
 
       for (let index = 2; index <= worksheet.rowCount; index++) {
         let row = worksheet.getRow(index);
-        let username = String(row.getCell(usernameCol).value || "").trim();
-        let email = String(row.getCell(emailCol).value || "")
+        let username = extractCellText(row.getCell(usernameCol).value).trim();
+        let email = extractCellText(row.getCell(emailCol).value)
+          .replace(/\u00A0/g, " ")
+          .replace(/\s+/g, "")
           .trim()
           .toLowerCase();
         let rowErrors = [];
